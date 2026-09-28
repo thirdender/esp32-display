@@ -28,6 +28,7 @@ static inline uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b)
 void display_init(void);
 void display_clear(uint16_t color);
 void display_flush(void);
+void display_set_backlight(uint8_t percent);
 void display_fill_rect(int x, int y, int w, int h, uint16_t color);
 
 int  display_text_width(const char *s, int scale);

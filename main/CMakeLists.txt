@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "main.c" "display.c" "weather.c" "led.c"
+    SRCS "main.c" "display.c" "weather.c" "led.c" "screen.c"
     INCLUDE_DIRS "."
     REQUIRES
         esp_lcd
@@ -10,6 +10,7 @@ idf_component_register(
         esp_wifi
         esp_netif
         esp_event
+        esp_timer
         nvs_flash
         esp_http_client
         json

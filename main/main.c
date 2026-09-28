@@ -4,11 +4,13 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 
 #include "board_config.h"
 #include "display.h"
 #include "weather.h"
 #include "led.h"
+#include "screen.h"
 
 #define TAG "main"
 
@@ -110,6 +112,7 @@ void app_main(void)
 {
     display_init();
     led_init();
+    screen_init();
 
 #if TEST_PATTERN
     test_pattern();
@@ -117,36 +120,54 @@ void app_main(void)
 
     bool wifi_started = false;
     bool first = true;
+    int64_t next_refresh = 0; /* refresh immediately on boot */
 
-    while (1) {
-        if (!wifi_started) {
-            splash("Weather Display", "Connecting to WiFi...");
-            led_set(0, 0, 255);
-            wifi_connect();
-            wifi_started = true;
-        } else if (!wifi_is_up()) {
-            wifi_start_reconnect();
-            if (!wifi_wait_connected(15)) {
-                splash("Weather Display", "No WiFi, retrying...");
-                led_set(255, 0, 0);
-                vTaskDelay(pdMS_TO_TICKS(REFRESH_FAIL_S * 1000));
-                continue;
+    for (;;) {
+        screen_event_t ev = screen_tick();
+        if (ev == SCREEN_WOKE) {
+            next_refresh = 0;
+        } else if (ev == SCREEN_SLEPT) {
+            led_off();
+        }
+
+        if (screen_is_off()) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+            continue;
+        }
+
+        if (esp_timer_get_time() >= next_refresh) {
+            if (!wifi_started) {
+                splash("Weather Display", "Connecting to WiFi...");
+                led_set(0, 0, 255);
+                wifi_connect();
+                wifi_started = true;
+            } else if (!wifi_is_up()) {
+                wifi_start_reconnect();
+                if (!wifi_wait_connected(15)) {
+                    splash("Weather Display", "No WiFi, retrying...");
+                    led_set(255, 0, 0);
+                    next_refresh = esp_timer_get_time() + (int64_t)REFRESH_FAIL_S * 1000000;
+                    continue;
+                }
             }
+
+            splash(first ? "Weather Display" : "Refreshing...", "Fetching forecast...");
+            led_set(255, 180, 0);
+
+            weather_t w;
+            if (weather_fetch(&w)) {
+                render(&w);
+                led_set(0, 255, 0);
+                next_refresh = esp_timer_get_time() + (int64_t)REFRESH_OK_S * 1000000;
+            } else {
+                splash("Weather Display", "Fetch failed, retrying...");
+                led_set(255, 0, 0);
+                next_refresh = esp_timer_get_time() + (int64_t)REFRESH_FAIL_S * 1000000;
+            }
+            screen_mark_active();
+            first = false;
         }
 
-        splash(first ? "Weather Display" : "Refreshing...", "Fetching forecast...");
-        led_set(255, 180, 0);
-
-        weather_t w;
-        if (weather_fetch(&w)) {
-            render(&w);
-            led_set(0, 255, 0);
-            vTaskDelay(pdMS_TO_TICKS(REFRESH_OK_S * 1000));
-        } else {
-            splash("Weather Display", "Fetch failed, retrying...");
-            led_set(255, 0, 0);
-            vTaskDelay(pdMS_TO_TICKS(REFRESH_FAIL_S * 1000));
-        }
-        first = false;
+        vTaskDelay(pdMS_TO_TICKS(200));
     }
 }

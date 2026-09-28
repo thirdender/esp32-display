@@ -8,6 +8,7 @@
 #define PIN_LCD_RST    21
 #define PIN_LCD_BL     22
 #define PIN_RGB_LED    8
+#define PIN_BUTTON     9
 
 #define LCD_HOST       SPI2_HOST
 #define LCD_H_RES      172

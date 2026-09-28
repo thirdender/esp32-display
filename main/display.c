@@ -53,6 +53,11 @@ static void backlight_set(uint8_t percent)
     ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0));
 }
 
+void display_set_backlight(uint8_t percent)
+{
+    backlight_set(percent);
+}
+
 static void lcd_reset(void)
 {
     gpio_config_t cfg = {
