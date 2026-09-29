@@ -18,6 +18,8 @@ static inline uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b)
 #define C_DIM     rgb565(130, 146, 164)
 #define C_ACCENT  rgb565(79, 195, 247)
 #define C_LINE    rgb565(44, 60, 86)
+#define C_HIGH    rgb565(255, 183, 77)
+#define C_LOW     rgb565(100, 181, 246)
 #define C_SUN     rgb565(255, 213, 79)
 #define C_CLOUD   rgb565(176, 190, 197)
 #define C_RAIN    rgb565(100, 181, 246)
@@ -27,9 +29,11 @@ static inline uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b)
 
 void display_init(void);
 void display_clear(uint16_t color);
+void display_clear_bg(void);
 void display_flush(void);
 void display_set_backlight(uint8_t percent);
 void display_fill_rect(int x, int y, int w, int h, uint16_t color);
+void display_fill_round_rect(int x, int y, int w, int h, int r, uint16_t color);
 
 int  display_text_width(const char *s, int scale);
 void display_text(int x, int y, const char *s, uint16_t fg, uint16_t bg, int scale, bool fill_bg);

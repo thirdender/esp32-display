@@ -14,11 +14,14 @@
 
 #include "generated/font_small.h"
 #include "generated/font_big.h"
+#include "generated/sky.h"
 
 #define TAG "display"
 
 static esp_lcd_panel_io_handle_t s_io = NULL;
 static uint16_t *s_fb = NULL;
+
+static inline uint16_t fix_color(uint16_t v);
 
 static void backlight_init(void)
 {
@@ -99,6 +102,7 @@ static void st7789_init(void)
 static void st7789_fill_full(uint16_t color)
 {
     static uint16_t rowbuf[240 * 40];
+    color = fix_color(color); /* compensate panel invert + BGR like the flush does */
     for (int i = 0; i < 240 * 40; i++) {
         rowbuf[i] = color;
     }
@@ -163,6 +167,14 @@ void display_clear(uint16_t color)
     }
 }
 
+void display_clear_bg(void)
+{
+    if (!s_fb) {
+        return;
+    }
+    memcpy(s_fb, sky_bg, sizeof(sky_bg));
+}
+
 void display_fill_rect(int x, int y, int w, int h, uint16_t color)
 {
     if (x < 0) {
@@ -190,6 +202,52 @@ void display_fill_rect(int x, int y, int w, int h, uint16_t color)
     }
 }
 
+void display_fill_round_rect(int x, int y, int w, int h, int r, uint16_t color)
+{
+    if (r <= 0 || 2 * r >= w || 2 * r >= h) {
+        display_fill_rect(x, y, w, h, color);
+        return;
+    }
+    /* body */
+    display_fill_rect(x + r, y, w - 2 * r, h, color);
+    display_fill_rect(x, y + r, w, h - 2 * r, color);
+    /* four rounded corners */
+    for (int dy = -r; dy <= r; dy++) {
+        for (int dx = -r; dx <= r; dx++) {
+            if (dx * dx + dy * dy <= r * r) {
+                int xl = x + r + dx, yt = y + r + dy;
+                if (xl >= 0 && xl < LCD_H_RES && yt >= 0 && yt < LCD_V_RES) {
+                    s_fb[yt * LCD_H_RES + xl] = color;
+                }
+                xl = x + w - r - 1 + dx;
+                if (xl >= 0 && xl < LCD_H_RES && yt >= 0 && yt < LCD_V_RES) {
+                    s_fb[yt * LCD_H_RES + xl] = color;
+                }
+                int yb = y + h - r - 1 + dy;
+                xl = x + r + dx;
+                if (xl >= 0 && xl < LCD_H_RES && yb >= 0 && yb < LCD_V_RES) {
+                    s_fb[yb * LCD_H_RES + xl] = color;
+                }
+                xl = x + w - r - 1 + dx;
+                if (xl >= 0 && xl < LCD_H_RES && yb >= 0 && yb < LCD_V_RES) {
+                    s_fb[yb * LCD_H_RES + xl] = color;
+                }
+            }
+        }
+    }
+}
+
+/* The panel inverts colors and swaps R/B (BGR). Compensate by pre-applying
+ * the inverse (swap R/B, then invert) to each pixel before sending. */
+static inline uint16_t fix_color(uint16_t v)
+{
+    uint16_t r = (v >> 11) & 0x1F;
+    uint16_t g = (v >> 5) & 0x3F;
+    uint16_t b = v & 0x1F;
+    v = (uint16_t)((b << 11) | (g << 5) | r); /* swap R and B */
+    return (uint16_t)(0xFFFF ^ v);            /* invert */
+}
+
 void display_flush(void)
 {
     int x0 = LCD_GAP_X;
@@ -207,6 +265,9 @@ void display_flush(void)
     };
     esp_lcd_panel_io_tx_param(s_io, 0x2A, caset, 4);
     esp_lcd_panel_io_tx_param(s_io, 0x2B, raset, 4);
+    for (int i = 0; i < LCD_H_RES * LCD_V_RES; i++) {
+        s_fb[i] = fix_color(s_fb[i]);
+    }
     esp_lcd_panel_io_tx_color(s_io, 0x2C, s_fb, LCD_H_RES * LCD_V_RES * sizeof(uint16_t));
 }
 

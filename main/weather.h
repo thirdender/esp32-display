@@ -16,6 +16,8 @@ typedef struct {
     float min0;
     float max1;
     float min1;
+    float hourly[2][24];
+    bool  hourly_valid;
 } weather_t;
 
 const weather_icon_t *weather_icon(int code, uint16_t *main_col, uint16_t *detail_col);

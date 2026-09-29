@@ -108,7 +108,8 @@ static const char *API_URL =
     "&longitude=" WEATHER_LON
     "&current=temperature_2m,weather_code"
     "&daily=weather_code,temperature_2m_max,temperature_2m_min"
-    "&timezone=auto&forecast_days=3&temperature_unit=celsius";
+    "&hourly=temperature_2m"
+    "&timezone=auto&forecast_days=2&temperature_unit=celsius";
 
 static bool http_get(const char *url, char *buf, size_t buflen)
 {
@@ -173,6 +174,9 @@ bool weather_fetch(weather_t *w)
         cJSON *mx = cJSON_GetObjectItem(daily, "temperature_2m_max");
         cJSON *mn = cJSON_GetObjectItem(daily, "temperature_2m_min");
 
+        cJSON *hourly = cJSON_GetObjectItem(root, "hourly");
+        cJSON *htemps = hourly ? cJSON_GetObjectItem(hourly, "temperature_2m") : NULL;
+
         if (cJSON_IsNumber(t) && cJSON_IsNumber(c) && cJSON_IsString(tm) &&
             cJSON_IsArray(times) && cJSON_IsArray(codes) && cJSON_IsArray(mx) && cJSON_IsArray(mn) &&
             cJSON_GetArraySize(times) >= 2) {
@@ -194,6 +198,15 @@ bool weather_fetch(weather_t *w)
             w->min0 = (float)cJSON_GetArrayItem(mn, 0)->valuedouble;
             w->max1 = (float)cJSON_GetArrayItem(mx, 1)->valuedouble;
             w->min1 = (float)cJSON_GetArrayItem(mn, 1)->valuedouble;
+
+            w->hourly_valid = false;
+            if (cJSON_IsArray(htemps) && cJSON_GetArraySize(htemps) >= 48) {
+                for (int i = 0; i < 48; i++) {
+                    w->hourly[i / 24][i % 24] =
+                        (float)cJSON_GetArrayItem(htemps, i)->valuedouble;
+                }
+                w->hourly_valid = true;
+            }
             ok = true;
         }
     }
